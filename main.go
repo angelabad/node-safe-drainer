@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	"angelabad.me/node-safe-drain/client"
@@ -17,9 +19,13 @@ func main() {
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
-	nodeName := flag.String("node-name", "", "Node name to safe drain")
 	flag.Parse()
+	if len(os.Args) != 2 {
+		fmt.Println("Empty node name, provide it as an argument.")
+		os.Exit(0)
+	}
 
+	nodeName := os.Args[1]
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err.Error())
@@ -33,7 +39,7 @@ func main() {
 		Clientset: clientset,
 	}
 
-	if err := client.CordonAndEmpty(*nodeName); err != nil {
+	if err := client.CordonAndEmpty(nodeName); err != nil {
 		panic(err.Error())
 	}
 }
