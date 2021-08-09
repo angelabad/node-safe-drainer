@@ -1,17 +1,14 @@
-package main
+package client
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestMain(t *testing.T) {
+func fakeClient() Client {
 	fake := fake.NewSimpleClientset(&corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
@@ -41,17 +38,38 @@ func TestMain(t *testing.T) {
 		},
 	)
 
-	nodes, err := fake.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		fmt.Printf("FALLO\n")
+	client := Client{
+		Clientset: fake,
 	}
 
-	for _, node := range nodes.Items {
-		fmt.Printf("ESTE NODO ES: %s\n", node.Name)
-		testPods, _ := fake.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
-			FieldSelector: "spec.nodeName=" + node.Name,
-		})
-		fmt.Printf("PODS: %s\n", testPods.Items[0].Name)
+	return client
+}
+
+func TestCordonNode(t *testing.T) {
+	client := fakeClient()
+	if err := client.cordonNode("node1"); err != nil {
+		panic(err.Error())
 	}
-	assert.Equal(t, "angel", "angel")
+
+}
+
+func TestCheckNodeName(t *testing.T) {
+	client := fakeClient()
+	if err := client.checkNodeName("node2"); err != nil {
+		panic(err.Error())
+	}
+}
+
+func TestUpdateDeployments(t *testing.T) {
+	client := fakeClient()
+	if err := client.updateDeployments("node1"); err != nil {
+		panic(err.Error())
+	}
+}
+
+func TestCordonAndEmpty(t *testing.T) {
+	client := fakeClient()
+	if err := client.CordonAndEmpty("node1"); err != nil {
+		panic(err.Error())
+	}
 }
