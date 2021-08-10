@@ -6,10 +6,17 @@ import (
 	"fmt"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+)
+
+const (
+	poll             = 2 * time.Second
+	pollShortTimeout = 1 * time.Minute
 )
 
 type Client struct {
@@ -88,7 +95,10 @@ func (c Client) updateDeployments(node string) error {
 				}
 				annotations["roller.angelabad.me/restartedAt"] = time.Now().String()
 				result.Spec.Template.Annotations = annotations
-				_, updateErr := c.Clientset.AppsV1().Deployments(replica.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
+				deployment, updateErr := c.Clientset.AppsV1().Deployments(replica.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
+
+				err = c.waitForDeploymentComplete(deployment)
+
 				return updateErr
 			})
 			if err != nil {
@@ -98,4 +108,38 @@ func (c Client) updateDeployments(node string) error {
 	}
 
 	return nil
+}
+
+func (c Client) waitForDeploymentComplete(d *appsv1.Deployment) error {
+	var reason string
+
+	err := wait.PollImmediate(poll, pollShortTimeout, func() (bool, error) {
+		deployment, err := c.Clientset.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if deploymentComplete(d, &deployment.Status) {
+			return true, nil
+		}
+
+		reason = fmt.Sprintf("deployment status: %#v", deployment.Status)
+
+		return false, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		return fmt.Errorf("error waiting timeout: %s", reason)
+	}
+	if err != nil {
+		return fmt.Errorf("error waiting for deployment %q status to match expectation: %v", d.Name, err)
+	}
+
+	return nil
+}
+
+func deploymentComplete(deployment *appsv1.Deployment, newStatus *appsv1.DeploymentStatus) bool {
+	return newStatus.UpdatedReplicas == *(deployment.Spec.Replicas) &&
+		newStatus.Replicas == *(deployment.Spec.Replicas) &&
+		newStatus.AvailableReplicas == *(deployment.Spec.Replicas) &&
+		newStatus.ObservedGeneration >= deployment.Generation
 }

@@ -5,3 +5,14 @@ repos:
     - id: check-merge-conflict
     - id: trailing-whitespace
     - id: end-of-file-fixer
+- repo: git://github.com/Bahjat/pre-commit-golang
+  rev: master
+  hooks:
+   - id: go-fmt-import
+   - id: go-vet
+   - id: go-lint
+   #- id: go-unit-tests
+   #- id: gofumpt # requires github.com/mvdan/gofumpt
+   #- id: go-err-check # requires github.com/kisielk/errcheck
+   #- id: go-static-check # install https://staticcheck.io/docs/
+   #- id: golangci-lint # requires github.com/golangci/golangci-lint
