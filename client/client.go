@@ -23,6 +23,11 @@ type Client struct {
 	Clientset kubernetes.Interface
 }
 
+type Deployment struct {
+	Namespace string
+	Name      string
+}
+
 type patchStringValue struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`
@@ -68,7 +73,9 @@ func (c Client) checkNodeName(name string) error {
 	return nil
 }
 
-func (c Client) updateDeployments(node string) error {
+func (c Client) getNodeDeployments(node string) ([]Deployment, error) {
+	var deployments []Deployment
+
 	pods, err := c.Clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
 		FieldSelector: "spec.nodeName=" + node,
 	})
@@ -80,30 +87,45 @@ func (c Client) updateDeployments(node string) error {
 		if pod.OwnerReferences[0].Kind == "ReplicaSet" {
 			replica, err := c.Clientset.AppsV1().ReplicaSets(pod.Namespace).Get(context.TODO(), pod.OwnerReferences[0].Name, metav1.GetOptions{})
 			if err != nil {
-				return err
+				return nil, err
 			}
-			fmt.Printf("Namespace: %s, Deployment: %s\n", pod.Namespace, replica.OwnerReferences[0].Name)
+			deployment := Deployment{
+				Namespace: replica.Namespace,
+				Name:      replica.OwnerReferences[0].Name,
+			}
+			deployments = append(deployments, deployment)
+		}
+	}
 
-			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				result, getErr := c.Clientset.AppsV1().Deployments(replica.Namespace).Get(context.TODO(), replica.OwnerReferences[0].Name, metav1.GetOptions{})
-				if getErr != nil {
-					panic(getErr.Error())
-				}
-				annotations := result.Spec.Template.GetAnnotations()
-				if annotations == nil {
-					annotations = make(map[string]string)
-				}
-				annotations["roller.angelabad.me/restartedAt"] = time.Now().String()
-				result.Spec.Template.Annotations = annotations
-				deployment, updateErr := c.Clientset.AppsV1().Deployments(replica.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
+	return deployments, nil
+}
 
-				err = c.waitForDeploymentComplete(deployment)
+func (c Client) updateDeployments(node string) error {
+	deployments, err := c.getNodeDeployments(node)
+	if err != nil {
+		return err
+	}
 
-				return updateErr
-			})
+	for _, deployment := range deployments {
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			result, err := c.Clientset.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
+			annotations := result.Spec.Template.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations["roller.angelabad.me/restartedAt"] = time.Now().String()
+			result.Spec.Template.Annotations = annotations
+			updatedDeployment, updateErr := c.Clientset.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
+
+			err = c.waitForDeploymentComplete(updatedDeployment)
+
+			return updateErr
+		})
+		if err != nil {
+			return err
 		}
 	}
 
