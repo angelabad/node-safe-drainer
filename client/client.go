@@ -23,11 +23,6 @@ type Client struct {
 	Clientset kubernetes.Interface
 }
 
-type Deployment struct {
-	Namespace string
-	Name      string
-}
-
 type patchStringValue struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`
@@ -73,8 +68,8 @@ func (c Client) checkNodeName(name string) error {
 	return nil
 }
 
-func (c Client) getNodeDeployments(node string) ([]Deployment, error) {
-	var deployments []Deployment
+func (c Client) getNodeDeployments(node string) (Deployments, error) {
+	var deployments Deployments
 
 	pods, err := c.Clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
 		FieldSelector: "spec.nodeName=" + node,
@@ -97,6 +92,7 @@ func (c Client) getNodeDeployments(node string) ([]Deployment, error) {
 		}
 	}
 
+	deployments.deduplicate()
 	return deployments, nil
 }
 
@@ -118,9 +114,11 @@ func (c Client) updateDeployments(node string) error {
 			}
 			annotations["roller.angelabad.me/restartedAt"] = time.Now().String()
 			result.Spec.Template.Annotations = annotations
+			fmt.Printf("Starting rolling out deployment: %s - %s\n", deployment.Namespace, deployment.Name)
 			updatedDeployment, updateErr := c.Clientset.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
 
 			err = c.waitForDeploymentComplete(updatedDeployment)
+			fmt.Printf("Finished: %s - %s\n", deployment.Namespace, deployment.Name)
 
 			return updateErr
 		})
