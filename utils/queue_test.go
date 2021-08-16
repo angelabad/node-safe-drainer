@@ -1,0 +1,75 @@
+package utils
+
+import (
+	"testing"
+)
+
+func TestAdd(t *testing.T) {
+	q := NewQueue(10)
+	defer q.Close()
+	n := 5
+	for i := 0; i != n; i++ {
+		q.Add()
+		go func(c int) {
+		}(i)
+	}
+	if jobs := q.Current(); jobs != n {
+		t.Errorf("Expected %d got %d", n, jobs)
+		t.Fail()
+	}
+}
+
+func TestWait(t *testing.T) {
+	q := NewQueue(10)
+	defer q.Close()
+	n := 5
+	for i := 0; i != n; i++ {
+		q.Add()
+		go func(c int) {
+			defer q.Done()
+		}(i)
+	}
+	// wait for the end of the all jobs
+	q.Wait()
+	if jobs := q.Current(); jobs != 0 {
+		t.Errorf("Expected %d got %d", 0, jobs)
+		t.Fail()
+	}
+}
+
+func TestDone(t *testing.T) {
+	q := NewQueue(10)
+	defer q.Close()
+	n := 5
+	for i := 0; i != n; i++ {
+		q.Add()
+		go func(c int) {
+			// let all the jobs done
+			defer q.Done()
+		}(i)
+	}
+	// wait for the end of the all jobs
+	q.Wait()
+	if jobs := q.Current(); jobs != 0 {
+		t.Errorf("Expected %d got %d", 0, jobs)
+		t.Fail()
+	}
+}
+
+func TestCurrent(t *testing.T) {
+	q := NewQueue(10)
+	defer q.Close()
+	n := 5
+	for i := 0; i != n; i++ {
+		q.Add()
+		go func(c int) {
+			defer q.Done()
+		}(i)
+	}
+	q.Wait()
+	// current should be 0
+	if jobs := q.Current(); jobs != 0 {
+		t.Errorf("Expected %d got %d", 0, jobs)
+		t.Fail()
+	}
+}

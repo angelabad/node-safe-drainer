@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"angelabad.me/node-safe-drain/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -102,30 +104,42 @@ func (c Client) updateDeployments(node string) error {
 		return err
 	}
 
+	maxInQueue := 10
+	q := utils.NewQueue(maxInQueue)
+	defer q.Close()
+
 	for _, deployment := range deployments {
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			result, err := c.Clientset.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
+		q.Add()
+
+		go func(d Deployment) error {
+			defer q.Done()
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				result, err := c.Clientset.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				annotations := result.Spec.Template.GetAnnotations()
+				if annotations == nil {
+					annotations = make(map[string]string)
+				}
+				annotations["roller.angelabad.me/restartedAt"] = time.Now().String()
+				result.Spec.Template.Annotations = annotations
+				fmt.Printf("Starting rolling out deployment: %s/%s\n", d.Namespace, d.Name)
+				updatedDeployment, updateErr := c.Clientset.AppsV1().Deployments(d.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
+
+				err = c.waitForDeploymentComplete(updatedDeployment)
+				fmt.Printf("Finished: %s/%s\n", d.Namespace, d.Name)
+
+				return updateErr
+			})
 			if err != nil {
 				return err
 			}
-			annotations := result.Spec.Template.GetAnnotations()
-			if annotations == nil {
-				annotations = make(map[string]string)
-			}
-			annotations["roller.angelabad.me/restartedAt"] = time.Now().String()
-			result.Spec.Template.Annotations = annotations
-			fmt.Printf("Starting rolling out deployment: %s - %s\n", deployment.Namespace, deployment.Name)
-			updatedDeployment, updateErr := c.Clientset.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
 
-			err = c.waitForDeploymentComplete(updatedDeployment)
-			fmt.Printf("Finished: %s - %s\n", deployment.Namespace, deployment.Name)
-
-			return updateErr
-		})
-		if err != nil {
-			return err
-		}
+			return nil
+		}(deployment)
 	}
+	q.Wait()
 
 	return nil
 }
