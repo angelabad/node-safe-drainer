@@ -114,7 +114,7 @@ func (c Client) updateDeployments(node string) error {
 		go func(d Deployment) error {
 			defer q.Done()
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				result, err := c.Clientset.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
+				result, err := c.Clientset.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
