@@ -124,7 +124,7 @@ func (c Client) updateDeployments(node string) error {
 				if annotations == nil {
 					annotations = make(map[string]string)
 				}
-				annotations["roller.angelabad.me/restartedAt"] = time.Now().String()
+				annotations["app.kubernetes.io/safeDrainRestarted"] = time.Now().Format(time.RFC3339)
 				result.Spec.Template.Annotations = annotations
 				fmt.Printf("Starting rolling out deployment: %s/%s\n", d.Namespace, d.Name)
 				updatedDeployment, updateErr := c.Clientset.AppsV1().Deployments(d.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
