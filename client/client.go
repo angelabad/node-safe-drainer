@@ -109,6 +109,8 @@ func (c Client) updateDeployments(node string) error {
 	defer q.Close()
 
 	for _, deployment := range deployments {
+		// Wait for kubernetes server too much requests error
+		time.Sleep(2 * time.Second)
 		q.Add()
 
 		go func(d Deployment) error {
