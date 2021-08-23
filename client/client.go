@@ -19,6 +19,7 @@ import (
 const (
 	poll             = 2 * time.Second
 	pollShortTimeout = 1 * time.Minute
+	maxInQueue       = 10
 )
 
 type Client struct {
@@ -29,6 +30,30 @@ type patchStringValue struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`
 	Value bool   `json:"value"`
+}
+
+func (c Client) Rollout(d Deployment) error {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		result, err := c.Clientset.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		annotations := result.Spec.Template.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations["app.kubernetes.io/safeDrainRestarted"] = time.Now().Format(time.RFC3339)
+		result.Spec.Template.Annotations = annotations
+		fmt.Printf("Starting rolling out deployment: %s/%s\n", d.Namespace, d.Name)
+		updatedDeployment, updateErr := c.Clientset.AppsV1().Deployments(d.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
+
+		err = c.waitForDeploymentComplete(updatedDeployment)
+		fmt.Printf("Finished: %s/%s\n", d.Namespace, d.Name)
+
+		return updateErr
+	})
+
+	return err
 }
 
 func (c Client) CordonAndEmpty(name string) error {
@@ -104,7 +129,6 @@ func (c Client) updateDeployments(node string) error {
 		return err
 	}
 
-	maxInQueue := 10
 	q := utils.NewQueue(maxInQueue)
 	defer q.Close()
 
@@ -115,29 +139,9 @@ func (c Client) updateDeployments(node string) error {
 
 		go func(d Deployment) error {
 			defer q.Done()
-			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				result, err := c.Clientset.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				annotations := result.Spec.Template.GetAnnotations()
-				if annotations == nil {
-					annotations = make(map[string]string)
-				}
-				annotations["app.kubernetes.io/safeDrainRestarted"] = time.Now().Format(time.RFC3339)
-				result.Spec.Template.Annotations = annotations
-				fmt.Printf("Starting rolling out deployment: %s/%s\n", d.Namespace, d.Name)
-				updatedDeployment, updateErr := c.Clientset.AppsV1().Deployments(d.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
-
-				err = c.waitForDeploymentComplete(updatedDeployment)
-				fmt.Printf("Finished: %s/%s\n", d.Namespace, d.Name)
-
-				return updateErr
-			})
-			if err != nil {
+			if err := c.Rollout(d); err != nil {
 				return err
 			}
-
 			return nil
 		}(deployment)
 	}
