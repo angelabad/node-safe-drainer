@@ -9,6 +9,7 @@ import (
 	"angelabad.me/node-safe-drain/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -95,6 +96,29 @@ func (c Client) checkNodeName(name string) error {
 	return nil
 }
 
+func (c Client) getPodDeploymentOwner(pod corev1.Pod) (Deployment, error) {
+	var deploy Deployment
+	namespace := pod.Namespace
+
+	replicaOwner := metav1.GetControllerOf(&pod)
+	if replicaOwner.Kind == "ReplicaSet" {
+		replica, err := c.Clientset.AppsV1().ReplicaSets(namespace).Get(context.TODO(), replicaOwner.Name, metav1.GetOptions{})
+		if err != nil {
+			return Deployment{}, err
+		}
+		deploymentOwner := metav1.GetControllerOf(replica)
+		if deploymentOwner.Kind == "Deployment" {
+			deployment, err := c.Clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentOwner.Name, metav1.GetOptions{})
+			if err != nil {
+				return Deployment{}, err
+			}
+			deploy.Name = deployment.Name
+			deploy.Namespace = deployment.Namespace
+		}
+	}
+	return deploy, nil
+}
+
 func (c Client) getNodeDeployments(node string) (Deployments, error) {
 	var deployments Deployments
 
@@ -106,17 +130,11 @@ func (c Client) getNodeDeployments(node string) (Deployments, error) {
 	}
 
 	for _, pod := range pods.Items {
-		if pod.OwnerReferences[0].Kind == "ReplicaSet" {
-			replica, err := c.Clientset.AppsV1().ReplicaSets(pod.Namespace).Get(context.TODO(), pod.OwnerReferences[0].Name, metav1.GetOptions{})
-			if err != nil {
-				return nil, err
-			}
-			deployment := Deployment{
-				Namespace: replica.Namespace,
-				Name:      replica.OwnerReferences[0].Name,
-			}
-			deployments = append(deployments, deployment)
+		deploy, err := c.getPodDeploymentOwner(pod)
+		if err != nil {
+			return nil, err
 		}
+		deployments = append(deployments, deploy)
 	}
 
 	deployments.deduplicate()
