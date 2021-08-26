@@ -57,34 +57,39 @@ func (c Client) Rollout(d Deployment) error {
 	return err
 }
 
-func (c Client) CordonAndEmpty(name string) error {
-	if err := c.cordonNode(name); err != nil {
+func (c Client) CordonAndEmpty(nodes []string) error {
+	if err := c.cordonNodes(nodes); err != nil {
 		return err
 	}
 
-	if err := c.updateDeployments(name); err != nil {
-		return err
+	for _, node := range nodes {
+		if err := c.updateDeployments(node); err != nil {
+			return err
+		}
 	}
 
 	return nil
+
 }
 
-func (c Client) cordonNode(name string) error {
+func (c Client) cordonNodes(nodes []string) error {
 	payload := []patchStringValue{{
 		Op:    "replace",
 		Path:  "/spec/unschedulable",
 		Value: true,
 	}}
 
-	err := c.checkNodeName(name)
-	if err != nil {
-		return err
+	for _, node := range nodes {
+		err := c.checkNodeName(node)
+		if err != nil {
+			return err
+		}
+
+		payloadBytes, _ := json.Marshal(payload)
+		_, err = c.Clientset.CoreV1().Nodes().Patch(context.TODO(), node, types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
 	}
 
-	payloadBytes, _ := json.Marshal(payload)
-	_, err = c.Clientset.CoreV1().Nodes().Patch(context.TODO(), name, types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
-
-	return err
+	return nil
 }
 
 func (c Client) checkNodeName(name string) error {

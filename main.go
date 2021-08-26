@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"angelabad.me/node-safe-drain/utils"
+
 	"angelabad.me/node-safe-drain/client"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -25,7 +27,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	nodeName := os.Args[1]
+	nodes := utils.ParseArgs(os.Args[1])
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err.Error())
@@ -39,7 +41,7 @@ func main() {
 		Clientset: clientset,
 	}
 
-	if err := client.CordonAndEmpty(nodeName); err != nil {
+	if err := client.CordonAndEmpty(nodes); err != nil {
 		panic(err.Error())
 	}
 }
