@@ -1,8 +1,9 @@
 package client
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	"testing"
+
+	appsv1 "k8s.io/api/apps/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -96,7 +97,7 @@ func TestRollout(t *testing.T) {
 
 func TestCordonNode(t *testing.T) {
 	client := fakeClient()
-	if err := client.cordonNode("node1"); err != nil {
+	if err := client.cordonNodes([]string{"node1"}); err != nil {
 		panic(err.Error())
 	}
 
@@ -111,14 +112,14 @@ func TestCheckNodeName(t *testing.T) {
 
 func TestUpdateDeployments(t *testing.T) {
 	client := fakeClient()
-	if err := client.updateDeployments("node1"); err != nil {
+	if err := client.updateDeployments([]string{"node1"}); err != nil {
 		panic(err.Error())
 	}
 }
 
 func TestCordonAndEmpty(t *testing.T) {
 	client := fakeClient()
-	if err := client.CordonAndEmpty("node1"); err != nil {
+	if err := client.CordonAndEmpty([]string{"node1"}); err != nil {
 		panic(err.Error())
 	}
 }

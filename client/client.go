@@ -46,12 +46,18 @@ func (c Client) Rollout(d Deployment) error {
 		annotations["app.kubernetes.io/safeDrainRestarted"] = time.Now().Format(time.RFC3339)
 		result.Spec.Template.Annotations = annotations
 		fmt.Printf("Starting rolling out deployment: %s/%s\n", d.Namespace, d.Name)
-		updatedDeployment, updateErr := c.Clientset.AppsV1().Deployments(d.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
+		updatedDeployment, err := c.Clientset.AppsV1().Deployments(d.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
 
 		err = c.waitForDeploymentComplete(updatedDeployment)
+		if err != nil {
+			return err
+		}
 		fmt.Printf("Finished: %s/%s\n", d.Namespace, d.Name)
 
-		return updateErr
+		return nil
 	})
 
 	return err
@@ -62,10 +68,8 @@ func (c Client) CordonAndEmpty(nodes []string) error {
 		return err
 	}
 
-	for _, node := range nodes {
-		if err := c.updateDeployments(node); err != nil {
-			return err
-		}
+	if err := c.updateDeployments(nodes); err != nil {
+		return err
 	}
 
 	return nil
@@ -87,6 +91,9 @@ func (c Client) cordonNodes(nodes []string) error {
 
 		payloadBytes, _ := json.Marshal(payload)
 		_, err = c.Clientset.CoreV1().Nodes().Patch(context.TODO(), node, types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -124,30 +131,33 @@ func (c Client) getPodDeploymentOwner(pod corev1.Pod) (Deployment, error) {
 	return deploy, nil
 }
 
-func (c Client) getNodeDeployments(node string) (Deployments, error) {
+func (c Client) getNodeDeployments(nodes []string) (Deployments, error) {
 	var deployments Deployments
 
-	pods, err := c.Clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
-		FieldSelector: "spec.nodeName=" + node,
-	})
-	if err != nil {
-		panic(err.Error())
-	}
-
-	for _, pod := range pods.Items {
-		deploy, err := c.getPodDeploymentOwner(pod)
+	for _, node := range nodes {
+		pods, err := c.Clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
+			FieldSelector: "spec.nodeName=" + node,
+		})
 		if err != nil {
-			return nil, err
+			panic(err.Error())
 		}
-		deployments = append(deployments, deploy)
+
+		for _, pod := range pods.Items {
+			deploy, err := c.getPodDeploymentOwner(pod)
+			if err != nil {
+				return nil, err
+			}
+			deployments = append(deployments, deploy)
+		}
 	}
 
 	deployments.deduplicate()
+
 	return deployments, nil
 }
 
-func (c Client) updateDeployments(node string) error {
-	deployments, err := c.getNodeDeployments(node)
+func (c Client) updateDeployments(nodes []string) error {
+	deployments, err := c.getNodeDeployments(nodes)
 	if err != nil {
 		return err
 	}
