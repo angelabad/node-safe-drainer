@@ -20,7 +20,6 @@ import (
 const (
 	poll             = 2 * time.Second
 	pollShortTimeout = 1 * time.Minute
-	maxInQueue       = 10
 )
 
 type Client struct {
@@ -63,12 +62,12 @@ func (c Client) Rollout(d Deployment) error {
 	return err
 }
 
-func (c Client) CordonAndEmpty(nodes []string) error {
+func (c Client) CordonAndEmpty(nodes []string, maxJobs int) error {
 	if err := c.cordonNodes(nodes); err != nil {
 		return err
 	}
 
-	if err := c.updateDeployments(nodes); err != nil {
+	if err := c.updateDeployments(nodes, maxJobs); err != nil {
 		return err
 	}
 
@@ -156,13 +155,13 @@ func (c Client) getNodeDeployments(nodes []string) (Deployments, error) {
 	return deployments, nil
 }
 
-func (c Client) updateDeployments(nodes []string) error {
+func (c Client) updateDeployments(nodes []string, maxJobs int) error {
 	deployments, err := c.getNodeDeployments(nodes)
 	if err != nil {
 		return err
 	}
 
-	q := utils.NewQueue(maxInQueue)
+	q := utils.NewQueue(maxJobs)
 	defer q.Close()
 
 	for _, deployment := range deployments {

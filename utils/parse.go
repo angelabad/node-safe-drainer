@@ -1,6 +1,8 @@
 package utils
 
-import "strings"
+import (
+	"strings"
+)
 
 func ParseArgs(args string) []string {
 	s := strings.Split(args, ",")
