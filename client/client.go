@@ -24,6 +24,7 @@ const (
 
 type Client struct {
 	Clientset kubernetes.Interface
+	MaxJobs   int
 }
 
 type patchStringValue struct {
@@ -62,12 +63,12 @@ func (c Client) Rollout(d Deployment) error {
 	return err
 }
 
-func (c Client) CordonAndEmpty(nodes []string, maxJobs int) error {
+func (c Client) CordonAndEmpty(nodes []string) error {
 	if err := c.cordonNodes(nodes); err != nil {
 		return err
 	}
 
-	if err := c.updateDeployments(nodes, maxJobs); err != nil {
+	if err := c.updateDeployments(nodes); err != nil {
 		return err
 	}
 
@@ -155,13 +156,13 @@ func (c Client) getNodeDeployments(nodes []string) (Deployments, error) {
 	return deployments, nil
 }
 
-func (c Client) updateDeployments(nodes []string, maxJobs int) error {
+func (c Client) updateDeployments(nodes []string) error {
 	deployments, err := c.getNodeDeployments(nodes)
 	if err != nil {
 		return err
 	}
 
-	q := utils.NewQueue(maxJobs)
+	q := utils.NewQueue(c.MaxJobs)
 	defer q.Close()
 
 	for _, deployment := range deployments {

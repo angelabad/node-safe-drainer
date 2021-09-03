@@ -78,6 +78,7 @@ func fakeClient() Client {
 
 	client := Client{
 		Clientset: fake,
+		MaxJobs:   10,
 	}
 
 	return client
@@ -112,14 +113,14 @@ func TestCheckNodeName(t *testing.T) {
 
 func TestUpdateDeployments(t *testing.T) {
 	client := fakeClient()
-	if err := client.updateDeployments([]string{"node1"}, 10); err != nil {
+	if err := client.updateDeployments([]string{"node1"}); err != nil {
 		panic(err.Error())
 	}
 }
 
 func TestCordonAndEmpty(t *testing.T) {
 	client := fakeClient()
-	if err := client.CordonAndEmpty([]string{"node1"}, 10); err != nil {
+	if err := client.CordonAndEmpty([]string{"node1"}); err != nil {
 		panic(err.Error())
 	}
 }

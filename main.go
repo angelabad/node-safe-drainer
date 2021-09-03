@@ -42,9 +42,10 @@ func main() {
 
 	client := client.Client{
 		Clientset: clientset,
+		MaxJobs:   *maxJobs,
 	}
 
-	if err := client.CordonAndEmpty(nodes, *maxJobs); err != nil {
+	if err := client.CordonAndEmpty(nodes); err != nil {
 		panic(err.Error())
 	}
 }
