@@ -1,4 +1,4 @@
-module angelabad.me/node-safe-drain
+module angelabad.me/node-safe-drainer
 
 go 1.16
 

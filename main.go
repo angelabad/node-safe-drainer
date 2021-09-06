@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"angelabad.me/node-safe-drain/utils"
+	"angelabad.me/node-safe-drainer/utils"
+	"angelabad.me/node-safe-drainer/client"
 
-	"angelabad.me/node-safe-drain/client"
 	flag "github.com/spf13/pflag"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
