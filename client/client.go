@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	poll             = 2 * time.Second
-	pollShortTimeout = 1 * time.Minute
+	pollInterval = 5 * time.Second
+	pollTimeout  = 20 * time.Minute
 )
 
 type Client struct {
@@ -186,7 +186,7 @@ func (c Client) updateDeployments(nodes []string) error {
 func (c Client) waitForDeploymentComplete(d *appsv1.Deployment) error {
 	var reason string
 
-	err := wait.PollImmediate(poll, pollShortTimeout, func() (bool, error) {
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		deployment, err := c.Clientset.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

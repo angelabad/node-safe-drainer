@@ -52,7 +52,7 @@ func main() {
 
 func usage() {
 	msg := `usage: node-safe-drainer [OPTIONS] <COMMA_SEPPARATED_NODE_NAMES>
-       Simple tool for safe draining nodes, rolling out deployments without donwtime.
+       Simple tool for safe draining nodes, rolling out deployments without downtime.
 	   `
 	fmt.Println(msg)
 	flag.PrintDefaults()
