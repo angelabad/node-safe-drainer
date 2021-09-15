@@ -33,7 +33,7 @@ type patchStringValue struct {
 	Value bool   `json:"value"`
 }
 
-func (c Client) Rollout(d Deployment) error {
+func (c *Client) Rollout(d Deployment) error {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		result, err := c.Clientset.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 		if err != nil {
@@ -63,7 +63,7 @@ func (c Client) Rollout(d Deployment) error {
 	return err
 }
 
-func (c Client) CordonAndEmpty(nodes []string) error {
+func (c *Client) CordonAndEmpty(nodes []string) error {
 	if err := c.cordonNodes(nodes); err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (c Client) CordonAndEmpty(nodes []string) error {
 
 }
 
-func (c Client) cordonNodes(nodes []string) error {
+func (c *Client) cordonNodes(nodes []string) error {
 	payload := []patchStringValue{{
 		Op:    "replace",
 		Path:  "/spec/unschedulable",
@@ -99,7 +99,7 @@ func (c Client) cordonNodes(nodes []string) error {
 	return nil
 }
 
-func (c Client) checkNodeName(name string) error {
+func (c *Client) checkNodeName(name string) error {
 	_, err := c.Clientset.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -108,7 +108,7 @@ func (c Client) checkNodeName(name string) error {
 	return nil
 }
 
-func (c Client) getPodDeploymentOwner(pod corev1.Pod) (Deployment, error) {
+func (c *Client) getPodDeploymentOwner(pod corev1.Pod) (Deployment, error) {
 	var deploy Deployment
 	namespace := pod.Namespace
 
@@ -131,7 +131,7 @@ func (c Client) getPodDeploymentOwner(pod corev1.Pod) (Deployment, error) {
 	return deploy, nil
 }
 
-func (c Client) getNodeDeployments(nodes []string) (Deployments, error) {
+func (c *Client) getNodeDeployments(nodes []string) (Deployments, error) {
 	var deployments Deployments
 
 	for _, node := range nodes {
@@ -156,7 +156,7 @@ func (c Client) getNodeDeployments(nodes []string) (Deployments, error) {
 	return deployments, nil
 }
 
-func (c Client) updateDeployments(nodes []string) error {
+func (c *Client) updateDeployments(nodes []string) error {
 	deployments, err := c.getNodeDeployments(nodes)
 	if err != nil {
 		return err
@@ -183,7 +183,7 @@ func (c Client) updateDeployments(nodes []string) error {
 	return nil
 }
 
-func (c Client) waitForDeploymentComplete(d *appsv1.Deployment) error {
+func (c *Client) waitForDeploymentComplete(d *appsv1.Deployment) error {
 	var reason string
 
 	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
