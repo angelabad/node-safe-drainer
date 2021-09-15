@@ -108,27 +108,30 @@ func (c *Client) checkNodeName(name string) error {
 	return nil
 }
 
-func (c *Client) getPodDeploymentOwner(pod corev1.Pod) (Deployment, error) {
-	var deploy Deployment
+// TODO: Manage and return errors on this function
+func (c *Client) getPodDeploymentOwner(pod corev1.Pod) *Deployment {
 	namespace := pod.Namespace
 
 	replicaOwner := metav1.GetControllerOf(&pod)
 	if replicaOwner.Kind == "ReplicaSet" {
 		replica, err := c.Clientset.AppsV1().ReplicaSets(namespace).Get(context.TODO(), replicaOwner.Name, metav1.GetOptions{})
 		if err != nil {
-			return Deployment{}, err
+			return nil
 		}
 		deploymentOwner := metav1.GetControllerOf(replica)
 		if deploymentOwner.Kind == "Deployment" {
 			deployment, err := c.Clientset.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentOwner.Name, metav1.GetOptions{})
 			if err != nil {
-				return Deployment{}, err
+				return nil
 			}
-			deploy.Name = deployment.Name
-			deploy.Namespace = deployment.Namespace
+			return &Deployment{
+				Namespace: deployment.Namespace,
+				Name:      deployment.Name,
+			}
 		}
 	}
-	return deploy, nil
+
+	return nil
 }
 
 func (c *Client) getNodeDeployments(nodes []string) (Deployments, error) {
@@ -143,11 +146,11 @@ func (c *Client) getNodeDeployments(nodes []string) (Deployments, error) {
 		}
 
 		for _, pod := range pods.Items {
-			deploy, err := c.getPodDeploymentOwner(pod)
-			if err != nil {
-				return nil, err
+			deploy := c.getPodDeploymentOwner(pod)
+
+			if deploy != nil {
+				deployments = append(deployments, *deploy)
 			}
-			deployments = append(deployments, deploy)
 		}
 	}
 
