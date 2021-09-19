@@ -19,12 +19,12 @@ import (
 
 const (
 	pollInterval = 5 * time.Second
-	pollTimeout  = 20 * time.Minute
 )
 
 type Client struct {
 	Clientset kubernetes.Interface
 	MaxJobs   int
+	Timeout   time.Duration
 }
 
 type patchStringValue struct {
@@ -74,6 +74,21 @@ func (c *Client) CordonAndEmpty(nodes []string) error {
 
 	return nil
 
+}
+
+func (c *Client) GetAllNodes() ([]string, error) {
+	nodeList := []string{}
+
+	nodes, err := c.Clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, node := range nodes.Items {
+		nodeList = append(nodeList, node.Name)
+	}
+
+	return nodeList, nil
 }
 
 func (c *Client) cordonNodes(nodes []string) error {
@@ -189,7 +204,7 @@ func (c *Client) updateDeployments(nodes []string) error {
 func (c *Client) waitForDeploymentComplete(d *appsv1.Deployment) error {
 	var reason string
 
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+	err := wait.PollImmediate(pollInterval, c.Timeout, func() (bool, error) {
 		deployment, err := c.Clientset.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

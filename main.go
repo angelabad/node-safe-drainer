@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"time"
 
 	"angelabad.me/node-safe-drainer/client"
 	"angelabad.me/node-safe-drainer/utils"
@@ -13,6 +14,11 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
+const (
+	defaultMaxJobs = 10
+	defaultTimeout = 20 * time.Minute
+)
+
 func main() {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
@@ -20,16 +26,12 @@ func main() {
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
-	maxJobs := flag.Int("max-jobs", 10, "max concurrent rollouts.")
+	maxJobs := flag.Int("max-jobs", defaultMaxJobs, "max concurrent rollouts.")
+	timeout := flag.Duration("timeout", defaultTimeout, "deployment rollouts timeout.")
+	allNodes := flag.Bool("all-nodes", false, "cordon and empty all nodes (use with caution)")
 	flag.Usage = utils.Usage
 	flag.Parse()
 
-	if len(flag.Args()) != 1 {
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	nodes := utils.ParseArgs(flag.Arg(0))
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err.Error())
@@ -42,6 +44,20 @@ func main() {
 	client := client.Client{
 		Clientset: clientset,
 		MaxJobs:   *maxJobs,
+		Timeout:   *timeout,
+	}
+
+	var nodes []string
+	if *allNodes {
+		nodes, err = client.GetAllNodes()
+		if err != nil {
+			panic(err.Error())
+		}
+	} else if len(flag.Args()) != 1 {
+		flag.Usage()
+		os.Exit(1)
+	} else {
+		nodes = utils.ParseArgs(flag.Arg(0))
 	}
 
 	if err := client.CordonAndEmpty(nodes); err != nil {

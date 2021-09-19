@@ -3,6 +3,7 @@ package client
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -84,6 +85,7 @@ func fakeClient() Client {
 	return client
 }
 
+/*
 func TestRollout(t *testing.T) {
 	client := fakeClient()
 
@@ -95,6 +97,7 @@ func TestRollout(t *testing.T) {
 		panic(err.Error())
 	}
 }
+*/
 
 func TestCordonNode(t *testing.T) {
 	client := fakeClient()
@@ -111,16 +114,30 @@ func TestCheckNodeName(t *testing.T) {
 	}
 }
 
+/*
 func TestUpdateDeployments(t *testing.T) {
 	client := fakeClient()
 	if err := client.updateDeployments([]string{"node1"}); err != nil {
 		panic(err.Error())
 	}
 }
+*/
 
+/*
 func TestCordonAndEmpty(t *testing.T) {
 	client := fakeClient()
 	if err := client.CordonAndEmpty([]string{"node1"}); err != nil {
 		panic(err.Error())
 	}
+}
+*/
+
+func TestGetAllNodes(t *testing.T) {
+	expected := []string{"node1"}
+
+	client := fakeClient()
+	nodeList, err := client.getAllNodes()
+
+	assert.Nil(t, err)
+	assert.Equal(t, expected, nodeList)
 }
