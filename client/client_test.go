@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -109,9 +109,9 @@ func TestCordonNode(t *testing.T) {
 
 func TestCheckNodeName(t *testing.T) {
 	client := fakeClient()
-	if err := client.checkNodeName("node1"); err != nil {
-		panic(err.Error())
-	}
+
+	err := client.checkNodeName("node1")
+	assert.Nil(t, err)
 }
 
 /*
@@ -136,8 +136,36 @@ func TestGetAllNodes(t *testing.T) {
 	expected := []string{"node1"}
 
 	client := fakeClient()
-	nodeList, err := client.getAllNodes()
+	nodeList, err := client.GetAllNodes()
 
 	assert.Nil(t, err)
 	assert.Equal(t, expected, nodeList)
+}
+
+func TestGetPodDeploymentOwner(t *testing.T) {
+	expected := &Deployment{
+		Namespace: "default",
+		Name:      "deploy1",
+	}
+
+	client := fakeClient()
+	pod, err := client.Clientset.CoreV1().Pods("default").Get(context.TODO(), "deploy1-1", metav1.GetOptions{})
+
+	assert.Nil(t, err)
+	assert.Equal(t, expected, client.getPodDeploymentOwner(*pod))
+}
+
+func TestGetNodeDeployments(t *testing.T) {
+	expected := Deployments{
+		Deployment{
+			Namespace: "default",
+			Name:      "deploy1",
+		},
+	}
+
+	client := fakeClient()
+	deploys, err := client.getNodeDeployments([]string{"node1"})
+
+	assert.Nil(t, err)
+	assert.Equal(t, expected, deploys)
 }
