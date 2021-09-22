@@ -128,6 +128,10 @@ func (c *Client) getPodDeploymentOwner(pod corev1.Pod) *Deployment {
 	namespace := pod.Namespace
 
 	replicaOwner := metav1.GetControllerOf(&pod)
+	if replicaOwner == nil {
+		return nil
+	}
+
 	if replicaOwner.Kind == "ReplicaSet" {
 		replica, err := c.Clientset.AppsV1().ReplicaSets(namespace).Get(context.TODO(), replicaOwner.Name, metav1.GetOptions{})
 		if err != nil {
@@ -157,7 +161,7 @@ func (c *Client) getNodeDeployments(nodes []string) (Deployments, error) {
 			FieldSelector: "spec.nodeName=" + node,
 		})
 		if err != nil {
-			panic(err.Error())
+			return Deployments{}, err
 		}
 
 		for _, pod := range pods.Items {
