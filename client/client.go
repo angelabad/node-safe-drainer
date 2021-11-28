@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gosuri/uiprogress"
+
 	"angelabad.me/node-safe-drainer/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -21,6 +23,7 @@ const (
 	pollInterval = 5 * time.Second
 )
 
+// Client for configuration options
 type Client struct {
 	Clientset kubernetes.Interface
 	MaxJobs   int
@@ -33,7 +36,10 @@ type patchStringValue struct {
 	Value bool   `json:"value"`
 }
 
-func (c *Client) Rollout(d Deployment) error {
+// Rollout a deployment and update progressbar
+func (c *Client) Rollout(bar *uiprogress.Bar, d Deployment) error {
+	defer bar.Incr()
+
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		result, err := c.Clientset.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 		if err != nil {
@@ -45,7 +51,7 @@ func (c *Client) Rollout(d Deployment) error {
 		}
 		annotations["app.kubernetes.io/safeDrainRestarted"] = time.Now().Format(time.RFC3339)
 		result.Spec.Template.Annotations = annotations
-		fmt.Printf("Starting rolling out deployment: %s/%s\n", d.Namespace, d.Name)
+
 		updatedDeployment, err := c.Clientset.AppsV1().Deployments(d.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
 		if err != nil {
 			return err
@@ -55,7 +61,6 @@ func (c *Client) Rollout(d Deployment) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Finished: %s/%s\n", d.Namespace, d.Name)
 
 		return nil
 	})
@@ -63,6 +68,43 @@ func (c *Client) Rollout(d Deployment) error {
 	return err
 }
 
+func (c *Client) updateDeployments(nodes []string) error {
+	deployments, err := c.getNodeDeployments(nodes)
+	if err != nil {
+		return err
+	}
+
+	q := utils.NewQueue(c.MaxJobs)
+	defer q.Close()
+
+	// Setup progressbar
+	uiprogress.Start()
+	defer uiprogress.Stop()
+	bar := uiprogress.AddBar(len(deployments)).AppendCompleted()
+	bar.PrependFunc(func(b *uiprogress.Bar) string {
+		return fmt.Sprintf("Rollouts (%d/%d)", b.Current(), len(deployments))
+	})
+
+	for _, deployment := range deployments {
+		// Wait for kubernetes server too much requests error
+		time.Sleep(2 * time.Second)
+		q.Add()
+
+		go func(bar *uiprogress.Bar, d Deployment) error {
+			defer q.Done()
+
+			if err := c.Rollout(bar, d); err != nil {
+				return err
+			}
+			return nil
+		}(bar, deployment)
+	}
+	q.Wait()
+
+	return nil
+}
+
+// CordonAndEmpty cordon and empty a kubernetes node
 func (c *Client) CordonAndEmpty(nodes []string) error {
 	if err := c.cordonNodes(nodes); err != nil {
 		return err
@@ -76,6 +118,7 @@ func (c *Client) CordonAndEmpty(nodes []string) error {
 
 }
 
+// GetAllNodes search for all nodes on the cluster
 func (c *Client) GetAllNodes() ([]string, error) {
 	nodeList := []string{}
 
@@ -176,33 +219,6 @@ func (c *Client) getNodeDeployments(nodes []string) (Deployments, error) {
 	deployments.deduplicate()
 
 	return deployments, nil
-}
-
-func (c *Client) updateDeployments(nodes []string) error {
-	deployments, err := c.getNodeDeployments(nodes)
-	if err != nil {
-		return err
-	}
-
-	q := utils.NewQueue(c.MaxJobs)
-	defer q.Close()
-
-	for _, deployment := range deployments {
-		// Wait for kubernetes server too much requests error
-		time.Sleep(2 * time.Second)
-		q.Add()
-
-		go func(d Deployment) error {
-			defer q.Done()
-			if err := c.Rollout(d); err != nil {
-				return err
-			}
-			return nil
-		}(deployment)
-	}
-	q.Wait()
-
-	return nil
 }
 
 func (c *Client) waitForDeploymentComplete(d *appsv1.Deployment) error {
