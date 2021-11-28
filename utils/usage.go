@@ -15,6 +15,7 @@ Options:
 `
 )
 
+// Usage shows flag usage help
 func Usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), usage, os.Args[0])
 	flag.PrintDefaults()

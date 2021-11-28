@@ -31,5 +31,3 @@ doesn't have downtime.
 If don't have an autoscaler for the nodes you must ensure that you
 have enough capacity in your nodes to store new deployments,
 otherwise, the nodes will be blocked until there is enough capacity.
-
-

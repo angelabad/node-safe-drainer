@@ -1,10 +1,12 @@
 package client
 
+// Deployment stores deployment namespace and name
 type Deployment struct {
 	Namespace string
 	Name      string
 }
 
+// Deployments is an slice of deployments
 type Deployments []Deployment
 
 func (d *Deployments) deduplicate() {
