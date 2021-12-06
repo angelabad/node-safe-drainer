@@ -31,3 +31,41 @@ doesn't have downtime.
 If don't have an autoscaler for the nodes you must ensure that you
 have enough capacity in your nodes to store new deployments,
 otherwise, the nodes will be blocked until there is enough capacity.
+
+## Compilation
+
+```
+$ git clone git@github.com:angelabad/node-safe-drainer.git
+$ cd node-safe-dainer
+$ go build
+```
+
+## Usage
+
+```
+usage: ./node-safe-drainer [OPTIONS] <COMMA_SEPPARATED_NODE_NAMES>
+
+Simple tool for safe draining nodes, rolling out deployments without downtime.
+
+Options:
+  -all-nodes
+    	cordon and empty all nodes (use with caution)
+  -kubeconfig string
+    	abslute path to the kubeconfig file (default "/home/angel/.kube/config")
+  -max-jobs int
+    	max concurrent rollouts. (default 10)
+  -timeout duration
+    	deployment rollouts timeout. (default 20m0s)
+```
+
+### For all nodes on cluster
+
+```
+$ ./node-safe-drainer -all-nodes
+```
+
+### For custom nodes
+
+```
+$ ./node-safe-drainer k3d-k3s-default-server-0,k3d-k3s-default-agent-0
+```
