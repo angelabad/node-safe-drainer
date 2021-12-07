@@ -32,7 +32,13 @@ If don't have an autoscaler for the nodes you must ensure that you
 have enough capacity in your nodes to store new deployments,
 otherwise, the nodes will be blocked until there is enough capacity.
 
-## Compilation
+## Install
+
+### Binary release
+
+Download binary from [relases](https://github.com/angelabad/node-safe-drainer/releases).
+
+### Source code
 
 ```
 $ git clone git@github.com:angelabad/node-safe-drainer.git
