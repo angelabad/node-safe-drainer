@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Angel Abad. All Rights Reserved.
+ * Copyright (c) 2021-2022 Angel Abad. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,8 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Second
+	pollInterval      = 5 * time.Second
+	rolloutAnnotation = "safenodedrainer.kubernetes.io/restartedAt"
 )
 
 // Client for configuration options
@@ -66,7 +67,7 @@ func (c *Client) Rollout(bar *uiprogress.Bar, d Deployment) error {
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
-		annotations["app.kubernetes.io/safeDrainRestarted"] = time.Now().Format(time.RFC3339)
+		annotations[rolloutAnnotation] = time.Now().Format(time.RFC3339)
 		result.Spec.Template.Annotations = annotations
 
 		updatedDeployment, err := c.Clientset.AppsV1().Deployments(d.Namespace).Update(context.TODO(), result, metav1.UpdateOptions{})
