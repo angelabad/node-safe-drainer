@@ -3,7 +3,10 @@
 
 
 <a name="0.0.1"></a>
-## 0.0.1 - 2021-12-07
+## 0.0.1 - 2022-02-01
+### Bug Fixes
+- Rename rollout annotation for terraform ignores
+
 ### Features
 - Use uiprogress for new pogressbar
 - Add readme file
