@@ -5,7 +5,7 @@ repos:
     - id: check-merge-conflict
     - id: trailing-whitespace
     - id: end-of-file-fixer
-- repo: git://github.com/Bahjat/pre-commit-golang
+- repo: https://github.com/Bahjat/pre-commit-golang
   rev: master
   hooks:
    - id: go-fmt-import
